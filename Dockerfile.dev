@@ -4,14 +4,11 @@
 # ==============================================
 FROM php:8.1-fpm-alpine
 
-# ติดตั้ง PHP Extensions + เครื่องมือที่จำเป็น
-RUN apk add --no-cache \
-    git curl zip unzip bash mysql-client nodejs npm \
-    libzip-dev freetype libpng libjpeg-turbo \
-    freetype-dev libpng-dev libjpeg-turbo-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_mysql gd zip bcmath \
-    && apk del freetype-dev libpng-dev libjpeg-turbo-dev
+# ติดตั้ง Extension ด้วย mlocati (แบบ Pre-compiled โหลดเสร็จใน 5 วินาที ไม่ต้อง Compile เอง 10 นาที)
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+
+RUN apk add --no-cache git curl zip unzip bash mysql-client nodejs npm && \
+    install-php-extensions pdo_mysql gd zip bcmath
 
 # ติดตั้ง Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
