@@ -77,6 +77,7 @@ pipeline {
                             sleep 15
                             
                             docker run --rm \
+                                --entrypoint sh \
                                 --link db_${BUILD_NUMBER}:db \
                                 -e DB_HOST=db \
                                 -e DB_CONNECTION=mysql \
@@ -84,7 +85,7 @@ pipeline {
                                 -e DB_USERNAME=laravel \
                                 -e DB_PASSWORD=password \
                                 ci_app_test:${BUILD_NUMBER} \
-                                sh -c "if [ ! -d vendor ]; then composer install --no-interaction; fi && php artisan migrate --force && php artisan test"
+                                -c "if [ ! -d vendor ]; then composer install --no-interaction; fi && php artisan migrate --force && php artisan test"
                             """
                         }
                     }
@@ -104,12 +105,12 @@ pipeline {
                         script {
                             echo "=== Testing .NET API ==="
 
-                            // Build .NET image แล้วรัน dotnet test
+                            // Build .NET image (ต้องใช้ SDK เพื่อเทส)
                             sh """
-                            docker build -t ci-dotnet-test:${BUILD_NUMBER} ./Api
+                            docker build --target build -t ci-dotnet-test:${BUILD_NUMBER} ./Api
 
-                            docker run --rm ci-dotnet-test:${BUILD_NUMBER} \
-                                dotnet test || echo 'No .NET tests found, skipping...'
+                            docker run --rm --entrypoint bash ci-dotnet-test:${BUILD_NUMBER} \
+                                -c "dotnet test || echo 'No .NET tests found, skipping...'"
                             """
                         }
                     }
