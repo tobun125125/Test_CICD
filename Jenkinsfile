@@ -58,31 +58,41 @@ pipeline {
                         script {
                             echo "=== Testing Laravel Application ==="
 
-                            // สร้าง CI compose ชั่วคราว (app + db) แล้วรัน test
+                            // 1. สร้าง DB Container ชั่วคราว
                             sh """
-                            docker compose -p ${COMPOSE_PROJECT_NAME} \
-                                -f compose.yaml up -d app db
+                            docker run -d --name db_${BUILD_NUMBER} \
+                                -e MYSQL_DATABASE=laravel \
+                                -e MYSQL_USER=laravel \
+                                -e MYSQL_PASSWORD=password \
+                                -e MYSQL_ROOT_PASSWORD=password \
+                                mysql:8.4
+                            """
+                            
+                            // 2. Build โค้ด Laravel เข้าไปใน Image เลยเพื่อป้องกันปัญหา Volume
+                            sh "docker build -t ci_app_test:${BUILD_NUMBER} -f Dockerfile.dev ."
 
-                            echo "Waiting for MySQL to be healthy..."
-                            sleep 20
-
-                            echo "Running migrations..."
-                            docker compose -p ${COMPOSE_PROJECT_NAME} \
-                                -f compose.yaml exec -T app \
-                                php artisan migrate --force || echo 'Migration skipped'
-
-                            echo "Running PHPUnit Tests..."
-                            docker compose -p ${COMPOSE_PROJECT_NAME} \
-                                -f compose.yaml exec -T app \
-                                php artisan test --no-interaction
+                            // 3. รันเทสโดยเชื่อมกับ DB ด้านบน
+                            sh """
+                            echo "Waiting for DB to start..."
+                            sleep 15
+                            
+                            docker run --rm \
+                                --link db_${BUILD_NUMBER}:db \
+                                -e DB_HOST=db \
+                                -e DB_CONNECTION=mysql \
+                                -e DB_DATABASE=laravel \
+                                -e DB_USERNAME=laravel \
+                                -e DB_PASSWORD=password \
+                                ci_app_test:${BUILD_NUMBER} \
+                                sh -c "if [ ! -d vendor ]; then composer install --no-interaction; fi && php artisan migrate --force && php artisan test"
                             """
                         }
                     }
                     post {
                         always {
                             sh """
-                            docker compose -p ${COMPOSE_PROJECT_NAME} \
-                                -f compose.yaml down -v --remove-orphans 2>/dev/null || true
+                            docker rmi ci_app_test:${BUILD_NUMBER} || true
+                            docker rm -f db_${BUILD_NUMBER} || true
                             """
                         }
                     }
