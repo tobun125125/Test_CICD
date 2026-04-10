@@ -85,7 +85,7 @@ pipeline {
                                 -e DB_USERNAME=laravel \
                                 -e DB_PASSWORD=password \
                                 ci_app_test:${BUILD_NUMBER} \
-                                -c "if [ ! -d vendor ]; then composer install --no-interaction; fi && php artisan migrate --force && php artisan test"
+                                -c "composer install --no-interaction && php artisan migrate --force && php artisan test"
                             """
                         }
                     }
